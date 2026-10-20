@@ -701,12 +701,9 @@ $('btnAccounts').addEventListener('click', () => {
   withBusy(async () => applyResult(await invoke('OpenAccountsDir')));
 });
 
-$('btnTray').addEventListener('click', async () => {
+// 关闭按钮 = 收进托盘，不是退出。真正退出只走托盘右键菜单的「退出程序」。
+$('btnClose').addEventListener('click', async () => {
   try { await invoke('HideToTray'); } catch (e) { /* ignore */ }
-});
-
-$('btnQuit').addEventListener('click', async () => {
-  try { await invoke('Quit'); } catch (e) { /* ignore */ }
 });
 
 document.addEventListener('keydown', (e) => {

@@ -202,7 +202,6 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
 .win-btn svg { width: var(--icon-sm); height: var(--icon-sm); }
 .win-btn:hover { background: rgba(255, 255, 255, .28); }
 .win-btn:active { transform: scale(.94); }
-.win-btn--close:hover { background: #E0453F; color: #fff; }
 
 /* ---------------------------------------------------------- 主体 */
 
