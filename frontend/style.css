@@ -378,11 +378,12 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
   position: absolute;
   z-index: 60;
   top: calc(100% + 10px);
-  /* 右边缘贴到窗口内边（-68 = 到 16px 内边距那条线）：这样左边不劈「新开窗口」，
-     右边也不会漏出「全部启动」的字边。 */
-  right: -68px;
-  width: 288px;
-  padding: 12px 14px 6px;
+  /* 具体的 right 由 JS 在每次打开时算（placeHelp()），这里只给个不出窗口的兜底值。
+     别写死像素：标题栏按钮增删、字号变化都会让锚点位置变，写死就会像以前那样顶出窗口。 */
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  padding: 13px 16px 8px;
   border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -393,7 +394,7 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
 .help-pop[hidden] { display: none; }
 
 .help-title {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 12px;
   font-weight: 700;
   color: var(--ink-700);
@@ -411,7 +412,7 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  padding: 7px 0;
+  padding: 8px 0;
 }
 
 .steps li + li { border-top: 1px dashed var(--line); }
@@ -440,10 +441,15 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
 
 .step-body i {
   font-style: normal;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.6;
   color: var(--ink-400);
+  /* 别把最后一个字甩到下一行（Chromium 117+ 支持，老版本自动忽略） */
+  text-wrap: pretty;
 }
+
+/* 按钮名不许折行：「打开登录窗口」被劈成两半没法看 */
+.nb { white-space: nowrap; }
 
 .list-head {
   display: flex;

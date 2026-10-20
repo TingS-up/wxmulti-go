@@ -376,6 +376,23 @@ el.accountList.addEventListener('keydown', (e) => {
 
 let helpTimer = null;
 
+// 气泡水平位置：右边缘对齐窗口内容区（16px 边距），左右都不许越出窗口。
+// 以前在 CSS 里写死 right:-68px（按“使用流程 + — + ✕”三个按钮算的），后来标题栏删掉一个按钮，
+// 锚点右移 34px，气泡就整块顶出右边缘、被窗口裁掉半截。
+const HELP_MARGIN = 16;
+function placeHelp() {
+  if (el.helpPop.hidden) return;
+  const wrapRight = el.helpWrap.getBoundingClientRect().right;
+  const width = el.helpPop.offsetWidth;
+  let right = wrapRight - (window.innerWidth - HELP_MARGIN);
+  const minRight = wrapRight - (window.innerWidth - 8);
+  const maxRight = wrapRight - 8 - width;
+  if (right < minRight) right = minRight;
+  if (right > maxRight) right = maxRight;
+  el.helpPop.style.right = Math.round(right) + 'px';
+}
+window.addEventListener('resize', placeHelp);
+
 // 气泡是绝对定位的，撑不大窗口；窗口矮的时候它就会被窗口底边裁掉。
 // WebView 里的东西不可能画到窗口外面去，所以打开时先把窗口临时长高到能装下整个气泡，
 // 关掉再缩回去。
@@ -383,6 +400,7 @@ async function showHelp() {
   clearTimeout(helpTimer);
   el.helpPop.hidden = false;
   el.helpBtn.setAttribute('aria-expanded', 'true');
+  placeHelp();
 
   // 用 offsetTop/offsetHeight 算底部，别用 getBoundingClientRect()：
   // 气泡有 140ms 的入场动画（translateY + scale），动画期间 rect 会被 transform 带偏，
