@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>微信多开助手</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="hdr">
+    <div class="hdr-layer"></div>
+    <div class="hdr-content">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"><img src="logo.png" alt="" width="34" height="34" /></div>
+        <div class="brand-text">
+          <h1>微信多开助手</h1>
+          <p>复登免扫码</p>
+        </div>
+      </div>
+      <div class="win-actions">
+        <div class="help-wrap">
+          <button class="help-link" id="helpBtn" aria-label="使用流程" aria-expanded="false" aria-controls="helpPop">
+            使用流程<span class="q">?</span>
+          </button>
+          <div class="help-pop" id="helpPop" role="tooltip" hidden>
+            <div class="help-title">使用流程</div>
+            <ol class="steps">
+              <li>
+                <span class="step-no">1</span>
+                <div class="step-body">
+                  <b>扫码登录</b>
+                  <i>点「打开登录窗口」，手机扫码进入任意一个微信号</i>
+                </div>
+              </li>
+              <li>
+                <span class="step-no">2</span>
+                <div class="step-body">
+                  <b>保存会话</b>
+                  <i>回到本窗口点「保存当前账号」，起个名字存下来</i>
+                </div>
+              </li>
+              <li>
+                <span class="step-no">3</span>
+                <div class="step-body">
+                  <b>下次复登</b>
+                  <i>切到「复登账号」选中它，直接进已登录界面，不用再扫</i>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <button class="win-btn" id="btnTray" title="收进托盘" aria-label="收进托盘">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4.5 10h11"/></svg>
+        </button>
+        <button class="win-btn win-btn--close" id="btnQuit" title="退出程序" aria-label="退出程序">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 两个模式：长在标题栏里，未选中那半直接吃标题栏的绿（含渐变），不另配色 -->
+    <div class="seg" role="tablist" aria-label="启动方式">
+      <button class="seg-item is-on" id="segNew" data-mode="new" role="tab" aria-selected="true">
+        <svg class="seg-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4.8v10.4M4.8 10h10.4"/></svg>
+        新开窗口
+      </button>
+      <button class="seg-item" id="segLogin" data-mode="login" role="tab" aria-selected="false">
+        <svg class="seg-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="7.1" r="3"/><path d="M4.6 16.2c.5-2.6 2.8-4.2 5.4-4.2s4.9 1.6 5.4 4.2"/></svg>
+        复登账号
+      </button>
+    </div>
+  </header>
+
+  <main class="main" id="main">
+
+    <!-- 复登账号 -->
+    <section class="panel" id="panelLogin" role="tabpanel" hidden>
+      <div class="list-head">
+        <span id="listTitle">可选账号</span>
+        <button class="mini-link" id="btnLaunchAll" hidden>全部启动</button>
+      </div>
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <circle cx="8.6" cy="8.6" r="5.2"/><path d="M12.6 12.6l4.1 4.1"/>
+        </svg>
+        <input id="searchInput" type="text" placeholder="搜索账号" autocomplete="off" spellcheck="false" aria-label="搜索账号" />
+        <button class="search-clear" id="searchClear" aria-label="清空搜索" hidden>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l8 8M14 6l-8 8"/></svg>
+        </button>
+      </div>
+      <div class="list" id="accountList" role="group" aria-label="已保存账号"></div>
+    </section>
+
+    <!-- 主按钮区：新开窗口时「打开登录窗口 + 保存当前账号」并排；
+         复登账号时「登录选中账号」独占一行、删除在下面 -->
+    <div class="cta" id="cta">
+      <button class="btn btn-primary btn-main" id="btnLaunch">
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M6.5 4.3l9 5.7-9 5.7z"/></svg>
+        <span id="launchText">打开登录窗口</span>
+      </button>
+      <button class="btn btn-ghost" id="btnSave">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 3.5h8.5L16 7v9.5H4z"/><path d="M7 3.5v4h5v-4M7 16.5v-4h6v4"/>
+        </svg>
+        保存当前账号
+      </button>
+      <button class="btn btn-ghost btn-ghost--danger" id="btnDelete" disabled>
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3.8 5.6h12.4M8 5.6V3.6h4v2M5.4 5.6l.8 10.8h7.6l.8-10.8"/>
+        </svg>
+        删除选中账号
+      </button>
+    </div>
+
+    <!-- 统计行（只在「新开窗口」显示）：放在按钮下面 -->
+    <section class="panel" id="panelStats" role="note">
+      <div class="hero-stats" id="heroStats"></div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- 配置目录：点这一整条展开/收起 -->
+    <section class="fold" id="fold">
+      <button class="fold-head" id="foldBtn" aria-expanded="false" aria-controls="foldBody">
+        <svg class="fold-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2.8 5.6a1.2 1.2 0 011.2-1.2h3.3l1.6 2h6.1a1.2 1.2 0 011.2 1.2v7.2a1.2 1.2 0 01-1.2 1.2H4a1.2 1.2 0 01-1.2-1.2z"/>
+        </svg>
+        <span class="fold-title">配置目录</span>
+        <span class="fold-tag" id="dirTag">未配置</span>
+        <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5.5 8l4.5 4.5L14.5 8"/>
+        </svg>
+      </button>
+
+      <div class="fold-body" id="foldBody" hidden>
+        <div class="dir-row">
+          <div class="dir-info">
+            <span class="dir-label">微信安装目录<i id="installVer"></i></span>
+            <span class="dir-path" id="installPath" title="">未设置</span>
+          </div>
+          <button class="btn btn-mini" id="btnInstall">选择</button>
+        </div>
+        <div class="dir-row">
+          <div class="dir-info">
+            <span class="dir-label">微信缓存目录<i id="cacheVer"></i></span>
+            <span class="dir-path" id="cachePath" title="">未设置</span>
+          </div>
+          <button class="btn btn-mini" id="btnCache">选择</button>
+        </div>
+        <p class="dir-note" id="dirNote">需要分别指向 Weixin.exe 所在目录和包含 xwechat_files 的目录。</p>
+
+        <!-- 账号目录：跟上面两个路径不是一类东西，用一条实线隔开 -->
+        <div class="dir-split"></div>
+        <div class="dir-row">
+          <div class="dir-info">
+            <span class="dir-label">账号目录</span>
+            <span class="dir-path" id="accountsPath" title="">—</span>
+          </div>
+          <button class="btn btn-mini" id="btnAccounts">打开</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="grow" aria-hidden="true"></div>
+  </main>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <div class="modal-mask" id="modalMask" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 class="modal-title" id="modalTitle">标题</h2>
+      <p class="modal-desc" id="modalDesc"></p>
+      <input class="modal-input" id="modalInput" type="text" maxlength="32" autocomplete="off" spellcheck="false" />
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modalCancel">取消</button>
+        <button class="btn btn-primary" id="modalOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
