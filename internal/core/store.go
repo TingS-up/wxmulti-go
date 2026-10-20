@@ -1,5 +1,4 @@
 // Package core 是工具的业务内核：配置、账号仓库、启动流程。
-// 行为与原版易语言源码 1.2.e 一一对应（见 REVERSE_NOTES.md）。
 package core
 
 import (
@@ -24,14 +23,14 @@ import (
 const (
 	// WeixinExe 微信 4.x 主程序名
 	WeixinExe = "Weixin.exe"
-	// MinWeixinVersion 原版要求主版本号 >= 4（只支持 xwechat 内核）
+	// MinWeixinVersion 要求主版本号 >= 4（只支持 xwechat 内核）
 	MinWeixinVersion = 4
 
 	globalConfigName = "global_config"
 	globalConfigCRC  = "global_config.crc"
 	accountMetaName  = "_meta.json"
 
-	// LaunchSettleDelay 与原版「程序_延时(2,1)」等价：启动后等 2 秒再清理预置会话文件
+	// LaunchSettleDelay 启动后等 2 秒再清理预置会话文件（这时微信已把会话读进内存）
 	LaunchSettleDelay = 2 * time.Second
 )
 
@@ -71,7 +70,7 @@ type accountMeta struct {
 
 // Store 管理 exe 同级的 data 目录
 type Store struct {
-	ExeDir    string // 运行目录（exe 所在目录），等价于易语言的「取运行目录」
+	ExeDir    string // 运行目录（exe 所在目录）
 	DataDir   string // <运行目录>\data
 	ConfigDir string // <运行目录>\data\allUsersConfig
 	IniPath   string // <运行目录>\data\config.ini
@@ -134,7 +133,7 @@ func WeixinConfigDir(cacheDir string) string {
 
 // ---------------------------------------------------------------- config.ini
 
-// ReadConfig 读取 config.ini，兼容老版易语言写出的 GBK 编码，
+// ReadConfig 读取 config.ini，兼容 GBK 编码的历史文件，
 // 也兼容记事本另存为时加的 UTF-8/UTF-16 BOM。
 func (s *Store) ReadConfig() Config {
 	cfg := Config{}
@@ -283,7 +282,7 @@ func ValidateCacheDir(dir string) error {
 
 // ---------------------------------------------------------------- 账号仓库
 
-// Accounts 枚举 data\allUsersConfig 下的账号目录（对应原版「多开_配置枚举」）。
+// Accounts 枚举 data\allUsersConfig 下的账号目录，按保存时间倒序。
 func (s *Store) Accounts() ([]Account, error) {
 	entries, err := os.ReadDir(s.ConfigDir)
 	if err != nil {
@@ -337,7 +336,7 @@ func (s *Store) describe(name string) Account {
 	return acc
 }
 
-// ValidateAccountName 校验账号名，非法字符与原版一致。
+// ValidateAccountName 校验账号名：非空、不超过 32 字、不以下划线或点开头、不含路径分隔符。
 func ValidateAccountName(name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -461,14 +460,14 @@ func (s *Store) DeleteAccount(name string) error {
 
 // ---------------------------------------------------------------- 启动流程
 
-// Launch 复刻原版 微信_启动目标：
+// Launch 按固定时序完成一次微信启动：
 //  1. 清理微信缓存目录里的 global_config(+crc)
 //  2. 若指定账号，则把保存的会话文件复制进去
 //  3. ShellExecute 打开 Weixin.exe
 //  4. 等 2 秒（微信已读取配置）后再清理一次，避免会话文件被别的实例复用
 //
 // 第一步是「尽力而为」：微信正开着的时候会独占 global_config.crc，
-// 改名和删除都可能失败。原版对这两个操作的结果都没检查，清不掉照样启动；
+// 改名和删除都可能失败，清不掉也照常启动；
 // 这里也一样，清不掉的失败只作为 warning 返回，不拦启动。
 func (s *Store) Launch(installDir, cacheDir, account string) (warnings []string, err error) {
 	cfgDir := WeixinConfigDir(cacheDir)
@@ -508,7 +507,7 @@ func (s *Store) Launch(installDir, cacheDir, account string) (warnings []string,
 	return warnings, nil
 }
 
-// clearGlobalConfig 对应原版 清理全局配置文件：先更名再删除。
+// clearGlobalConfig 清理全局配置文件：先更名再删除。
 // 微信会锁住 global_config，直接删除常常失败，改名通常还能成功。
 // 每次调用都顺手清掉上次留下的 global_configX 残骸（能删就删，删不掉下次再试）。
 func clearGlobalConfig(dir string) error {

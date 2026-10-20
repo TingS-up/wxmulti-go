@@ -5,6 +5,6 @@ const (
 	AppName    = "微信多开助手"
 	AppVersion = "1.3.0"
 	AppBuild   = "go-" + AppVersion
-	// AppTag 与原版一致，用于自身单实例互斥体名
+	// AppTag 用于本程序自身单实例互斥体的名字
 	AppTag = "VxNoNeedToScanCodeMultipleOpen2025"
 )

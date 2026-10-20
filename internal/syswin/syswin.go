@@ -54,7 +54,7 @@ const (
 	seKernelObject          = 6
 	daclSecurityInformation = 4
 	aclRevision             = 2
-	// 原易语言代码用的访问掩码字面量 1048575 = 0xFFFFF
+	// 访问掩码字面量 1048575 = 0xFFFFF，等于 STANDARD_RIGHTS_REQUIRED | SPECIFIC_RIGHTS_ALL
 	accessMaskDenyAll = 0x000FFFFF
 )
 
@@ -97,8 +97,8 @@ func CreateDenyAllMutex(name string) (windows.Handle, error) {
 	}
 	h, _, callErr := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(namePtr)))
 	if h == 0 {
-		// ACCESS_DENIED 说明这个互斥体已经被别的进程（比如本程序的另一个实例、
-		// 或者老版易语言工具）用拒绝型 DACL 占住了 —— 多开效果已经成立，不算失败。
+		// ACCESS_DENIED 说明这个互斥体已经被别的进程（比如本程序的另一个实例）
+		// 用拒绝型 DACL 占住了 —— 多开效果已经成立，不算失败。
 		if callErr == windows.ERROR_ACCESS_DENIED {
 			return 0, ErrMutexOccupied
 		}
@@ -192,7 +192,7 @@ func FileVersion(path string) (int, string, error) {
 	return major, fmt.Sprintf("%d.%d.%d.%d", major, minor, build, rev), nil
 }
 
-// ShellOpen 等价于易语言的 shell::执行(#打开文件, ...)，即“双击打开”。
+// ShellOpen 用 ShellExecute(open) 打开文件，效果等同于双击。
 func ShellOpen(file, workDir string) error {
 	verb, _ := windows.UTF16PtrFromString("open")
 	filePtr, err := windows.UTF16PtrFromString(file)

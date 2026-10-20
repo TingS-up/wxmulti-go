@@ -212,7 +212,7 @@ func (a *App) OnShutdown(ctx context.Context) {
 	}
 }
 
-// onSecondInstance 重复运行时把已有窗口拉出来（等价于原版的“程序_禁止重复运行”）。
+// onSecondInstance 重复运行时把已有窗口拉出来。
 func (a *App) onSecondInstance(_ options.SecondInstanceData) {
 	if a.ctx == nil {
 		return
