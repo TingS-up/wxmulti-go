@@ -761,14 +761,9 @@ async function boot() {
 
     // 存过账号就默认停在「复登账号」，一个账号都没有才停「新开窗口」。
     // 不看 ready：会话文件坏了的账号也得让人看见、好去删掉。
+    // 进来不预勾任何账号 —— 列表干净着给你看，勾哪个登录哪个。
     const all = state.accounts || [];
-    const ready = all.filter((a) => a.ready);
-    if (all.length) {
-      mode = 'login';
-      if (ready.length) picked = new Set([ready[0].name]);
-    } else {
-      mode = 'new';
-    }
+    mode = all.length ? 'login' : 'new';
     // 目录没配好就把目录设置摊开
     dirOpen = !state.ready;
     render();
