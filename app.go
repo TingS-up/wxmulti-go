@@ -524,6 +524,46 @@ func (a *App) DeleteAccount(name string) Result {
 
 // ---------------------------------------------------------------- 窗口
 
+// DialogRequest 是前端发来的弹窗请求（输入 / 确认 / 提示）。
+type DialogRequest struct {
+	Kind       string `json:"kind"`
+	Title      string `json:"title"`
+	Desc       string `json:"desc"`
+	Hint       string `json:"hint"`
+	Initial    string `json:"initial"`
+	OKText     string `json:"okText"`
+	CancelText string `json:"cancelText"`
+	Danger     bool   `json:"danger"`
+}
+
+// DialogReply 是弹窗结果：OK=false 表示取消；Text 是输入框里的内容。
+type DialogReply struct {
+	OK   bool   `json:"ok"`
+	Text string `json:"text"`
+}
+
+// PromptDialog 在屏幕正中弹一个原生窗口，阻塞到用户点确定/取消或按 Esc。
+// 前端所有 askDialog() 都走这里 —— WebView 里的弹窗只能画在 360px 的窗口内，会被裁。
+func (a *App) PromptDialog(req DialogRequest) DialogReply {
+	kind := syswin.DialogConfirm
+	switch req.Kind {
+	case "input":
+		kind = syswin.DialogInput
+	case "alert":
+		kind = syswin.DialogAlert
+	}
+	res := syswin.ShowDialog(syswin.DialogOpts{
+		Kind:       kind,
+		Title:      req.Title,
+		Desc:       req.Desc,
+		Hint:       req.Hint,
+		Initial:    req.Initial,
+		OKText:     req.OKText,
+		CancelText: req.CancelText,
+		Danger:     req.Danger,
+	})
+	return DialogReply{OK: res.OK, Text: res.Text}
+}
 // HideToTray 隐藏到托盘。
 func (a *App) HideToTray() {
 	runtime.WindowHide(a.ctx)

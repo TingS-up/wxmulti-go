@@ -39,12 +39,6 @@ const el = {
   foldBody: $('foldBody'),
 
   toasts: $('toasts'),
-  mask: $('modalMask'),
-  modalTitle: $('modalTitle'),
-  modalDesc: $('modalDesc'),
-  modalInput: $('modalInput'),
-  modalOk: $('modalOk'),
-  modalCancel: $('modalCancel'),
 };
 
 const ICON_CHECK = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l3.6 3.6L16 5.6"/></svg>`;
@@ -527,57 +521,33 @@ function toast(msg, kind = 'ok', ms = 2600) {
   }, ms);
 }
 
-/* ------------------------------------------------------------ 模态框 */
+/* ------------------------------------------------------------ 弹窗（原生窗口） */
 
-let modalResolver = null;
-
-function resolveModal(value) {
-  el.mask.hidden = true;
-  const r = modalResolver;
-  modalResolver = null;
-  if (r) r(value);
-}
-
-el.modalCancel.addEventListener('click', () => resolveModal(null));
-el.modalOk.addEventListener('click', () => {
-  if (el.modalInput.hidden) return resolveModal(true);
-  // 输入框允许留空：留空交给调用方决定（保存账号会退回默认建议名）
-  resolveModal(el.modalInput.value.trim());
-});
-el.mask.addEventListener('click', (e) => {
-  if (e.target === el.mask) resolveModal(null);
-});
-el.modalInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    el.modalOk.click();
+// 弹窗开在屏幕正中的独立窗口里（Go 侧 syswin.ShowDialog 自绘、输入框用系统 EDIT），
+// 不再挤在 360px 的主界面里 —— 那样一定会被窗口边界裁掉，也没法居中。
+async function askDialog(opts) {
+  const req = {
+    kind: opts.kind || 'confirm',
+    title: opts.title || '',
+    desc: opts.desc || '',
+    hint: opts.hint || '',
+    initial: opts.initial || '',
+    okText: opts.okText || '确定',
+    cancelText: opts.cancelText || '取消',
+    danger: !!opts.danger,
+  };
+  try {
+    const r = await invoke('PromptDialog', req);
+    return r && typeof r === 'object' ? r : { ok: false, text: '' };
+  } catch (e) {
+    logjs('PromptDialog 调用失败: ' + (e && e.message ? e.message : e));
+    return { ok: false, text: '' };
   }
-});
-
-function showModal({ title, desc, input, value = '', placeholder = '', okText = '确定', danger = false, alert = false }) {
-  el.modalTitle.textContent = title;
-  el.modalDesc.textContent = desc || '';
-  el.modalOk.textContent = okText;
-  el.modalOk.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
-  el.modalInput.hidden = !input;
-  el.modalInput.value = value;
-  el.modalInput.placeholder = placeholder || '';
-  el.modalCancel.hidden = alert;   // 纯提示就只留一个「知道了」
-  el.mask.hidden = false;
-  setTimeout(() => {
-    if (input) {
-      el.modalInput.focus();
-      el.modalInput.select();
-    } else {
-      el.modalOk.focus();
-    }
-  }, 30);
-  return new Promise((resolve) => { modalResolver = resolve; });
 }
 
-/* 纯提示框：错误信息里常带完整路径，用弹窗显示才不会被 360px 的窗口切掉 */
-function alertModal(title, desc) {
-  return showModal({ title, desc, okText: '知道了', alert: true, danger: false });
+/* 纯提示框（错误信息常带完整路径，交给原生窗口显示，能换行能滚动） */
+async function alertModal(title, desc) {
+  return askDialog({ kind: 'alert', title, desc, okText: '知道了' });
 }
 
 /* ------------------------------------------------------------ 操作 */
@@ -650,25 +620,26 @@ el.btnLaunchAll.addEventListener('click', () => {
 el.btnSave.addEventListener('click', () => {
   if (busy || !state) return;
   withBusy(async () => {
-    const typed = await showModal({
+    const suggested = suggestName();
+    const r1 = await askDialog({
+      kind: 'input',
       title: '保存当前账号',
       desc: '先在「新开窗口」里扫码登录一个微信，再回来保存。名字只用来在本地区分账号。',
-      input: true,
-      value: '',
-      placeholder: suggestName(),
+      hint: '留空就用 ' + suggested,
       okText: '保存',
     });
-    if (typed === null) return;                         // 点了取消
-    const name = String(typed).trim() || suggestName();  // 没打字就用占位里的默认名
+    if (!r1.ok) return;
+    const name = String(r1.text || '').trim() || suggested;
     let res = await invoke('SaveAccount', name, false);
     if (res && res.code === 'exists') {
-      const overwrite = await showModal({
+      const r2 = await askDialog({
+        kind: 'confirm',
         title: '覆盖已有账号？',
         desc: `「${name}」已经存在，覆盖后旧的登录会话会丢失。`,
         danger: true,
         okText: '覆盖',
       });
-      if (!overwrite) return;
+      if (!r2.ok) return;
       res = await invoke('SaveAccount', name, true);
     }
     // 保存完就留在「新开窗口」页：不跳转、也不替你勾账号，
@@ -682,7 +653,8 @@ el.btnDelete.addEventListener('click', () => {
   if (busy || names.length === 0) return;
   const one = names.length === 1;
   withBusy(async () => {
-    const yes = await showModal({
+    const r3 = await askDialog({
+      kind: 'confirm',
       title: one ? '删除账号' : `删除 ${names.length} 个账号`,
       desc: one
         ? `确定删除「${names[0]}」的本地登录会话吗？下次使用需要重新扫码。`
@@ -690,7 +662,7 @@ el.btnDelete.addEventListener('click', () => {
       danger: true,
       okText: '删除',
     });
-    if (!yes) return;
+    if (!r3.ok) return;
     let last = null;
     let failed = 0;
     for (const name of names) {
@@ -726,7 +698,7 @@ $('btnClose').addEventListener('click', async () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !el.mask.hidden) resolveModal(null);
+  // 弹窗现在是原生窗口，Esc 由它自己处理；这里只留个空壳，防止以后需要页面级快捷键
 });
 
 function suggestName() {
@@ -787,3 +759,4 @@ async function boot() {
 }
 
 boot();
+
