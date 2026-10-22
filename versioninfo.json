@@ -1,0 +1,41 @@
+{
+    "FixedFileInfo":  {
+                          "FileVersion":  {
+                                              "Major":  1,
+                                              "Minor":  3,
+                                              "Patch":  3,
+                                              "Build":  0
+                                          },
+                          "ProductVersion":  {
+                                                 "Major":  1,
+                                                 "Minor":  3,
+                                                 "Patch":  3,
+                                                 "Build":  0
+                                             },
+                          "FileFlagsMask":  "3f",
+                          "FileFlags":  "00",
+                          "FileOS":  "040004",
+                          "FileType":  "01",
+                          "FileSubType":  "00"
+                      },
+    "StringFileInfo":  {
+                           "Comments":  "https://github.com/TingS-up/wxmulti-go",
+                           "CompanyName":  "听说",
+                           "FileDescription":  "微信多开助手 - 微信多开与免扫码登录",
+                           "FileVersion":  "1.3.3.0",
+                           "InternalName":  "wxmulti-go",
+                           "LegalCopyright":  "听说 qq:1224947739",
+                           "LegalTrademarks":  "",
+                           "OriginalFilename":  "微信多开助手.exe",
+                           "PrivateBuild":  "",
+                           "ProductName":  "微信多开助手",
+                           "ProductVersion":  "1.3.3.0",
+                           "SpecialBuild":  ""
+                       },
+    "VarFileInfo":  {
+                        "Translation":  {
+                                            "LangID":  "0804",
+                                            "CharsetID":  "04B0"
+                                        }
+                    }
+}

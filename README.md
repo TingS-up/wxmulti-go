@@ -52,13 +52,19 @@ cd wxmulti-go
 .\build.ps1            # 或者看下面手打的三条命令
 ```
 
-`build.ps1` 做的事就三步（产物落在 `已编译成品\`）：
+`build.ps1` 做的事就四步（产物落在 `已编译成品\`）：
 
 ```powershell
 go run ./tools/mkicon app.ico frontend\logo.png   # 生成图标（已生成过可跳过）
+# 生成 exe 的图标 + 版本资源：把 app.ico 和 versioninfo.json 打包成 resource_windows_amd64.syso
+goversioninfo -icon app.ico -o resource_windows_amd64.syso versioninfo.json
 go mod tidy
 go build -tags desktop,production -trimpath -ldflags "-w -s -H windowsgui" -o ".\已编译成品\微信多开助手.exe" .
 ```
+
+`goversioninfo` 只影响 exe 属性面板里的「文件说明 / 版本 / 版权 / 语言」和图标，没有它也能编译（提交里带了生成好的 `.syso`，脚本会自动沿用）。要自己装：`go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest`。版本号只有一个来源 —— `internal/core/version.go` 的 `AppVersion`，`build.ps1` 会读它写进 `versioninfo.json`。
+
+> 图标和版本资源必须由**同一个** syso 提供（都落在 `.rsrc` 段里），分成两个 syso 会报 `too many .rsrc sections`。
 
 产物：`已编译成品\微信多开助手.exe`（单文件，约 11 MB）。目录名就叫「已编译成品」——`build` 太像临时目录，容易被顺手清掉（里面还有 `data\`，账号会话在那儿）。
 
