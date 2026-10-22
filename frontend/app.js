@@ -541,7 +541,8 @@ function resolveModal(value) {
 el.modalCancel.addEventListener('click', () => resolveModal(null));
 el.modalOk.addEventListener('click', () => {
   if (el.modalInput.hidden) return resolveModal(true);
-  resolveModal(el.modalInput.value.trim() || null);
+  // 输入框允许留空：留空交给调用方决定（保存账号会退回默认建议名）
+  resolveModal(el.modalInput.value.trim());
 });
 el.mask.addEventListener('click', (e) => {
   if (e.target === el.mask) resolveModal(null);
@@ -553,13 +554,14 @@ el.modalInput.addEventListener('keydown', (e) => {
   }
 });
 
-function showModal({ title, desc, input, value = '', okText = '确定', danger = false, alert = false }) {
+function showModal({ title, desc, input, value = '', placeholder = '', okText = '确定', danger = false, alert = false }) {
   el.modalTitle.textContent = title;
   el.modalDesc.textContent = desc || '';
   el.modalOk.textContent = okText;
   el.modalOk.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
   el.modalInput.hidden = !input;
   el.modalInput.value = value;
+  el.modalInput.placeholder = placeholder || '';
   el.modalCancel.hidden = alert;   // 纯提示就只留一个「知道了」
   el.mask.hidden = false;
   setTimeout(() => {
@@ -648,14 +650,16 @@ el.btnLaunchAll.addEventListener('click', () => {
 el.btnSave.addEventListener('click', () => {
   if (busy || !state) return;
   withBusy(async () => {
-    const name = await showModal({
+    const typed = await showModal({
       title: '保存当前账号',
       desc: '先在「新开窗口」里扫码登录一个微信，再回来保存。名字只用来在本地区分账号。',
       input: true,
-      value: suggestName(),
+      value: '',
+      placeholder: suggestName(),
       okText: '保存',
     });
-    if (!name) return;
+    if (typed === null) return;                         // 点了取消
+    const name = String(typed).trim() || suggestName();  // 没打字就用占位里的默认名
     let res = await invoke('SaveAccount', name, false);
     if (res && res.code === 'exists') {
       const overwrite = await showModal({

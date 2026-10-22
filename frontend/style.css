@@ -994,6 +994,8 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 
+.modal-input::placeholder { color: rgba(16, 40, 24, .34); }
+
 .modal-input:focus {
   border-color: var(--brand-500);
   box-shadow: 0 0 0 3px var(--brand-50);
