@@ -667,12 +667,9 @@ el.btnSave.addEventListener('click', () => {
       if (!overwrite) return;
       res = await invoke('SaveAccount', name, true);
     }
+    // 保存完就留在「新开窗口」页：不跳转、也不替你勾账号，
+    // 免得看着像“已经选中要登录的号”。想登录自己切到复登页勾。
     applyResult(res);
-    if (res && res.ok) {
-      picked = new Set([name]);
-      mode = 'login';
-      render();
-    }
   });
 });
 
