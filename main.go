@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -54,6 +55,13 @@ func main() {
 		return
 	}
 
+	// WebView2 的缓存默认落在 %APPDATA%\<exe 文件名>\ 下（70 MB 起，而且每换一次 exe 名字就多一份）。
+	// 那是纯缓存、不是用户设置，不该塞进漫游目录，统一放到 %LOCALAPPDATA%\微信多开助手\webview2。
+	webviewData := ""
+	if base := os.Getenv("LOCALAPPDATA"); base != "" {
+		webviewData = filepath.Join(base, core.AppName, "webview2")
+	}
+
 	err = wails.Run(&options.App{
 		Title:            core.AppName,
 		Width:            winWidth,
@@ -74,6 +82,7 @@ func main() {
 			Theme:                windows.SystemDefault,
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
+			WebviewUserDataPath:  webviewData,
 		},
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId:               core.AppTag,

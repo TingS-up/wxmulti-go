@@ -41,6 +41,8 @@ Go + Wails 写的单文件绿色版，界面卡片式，不用安装。
 
 **程序自己装在系统目录也行**：`data` 目录默认在 exe 旁边，如果那儿没有写权限（`C:\Program Files\...`），会自动退到 `%LOCALAPPDATA%\微信多开助手\data`，功能一样，日志里会留一行说明。
 
+**不往漫游目录写东西**：WebView2 默认会把渲染缓存塞进 `%APPDATA%\<exe 名>`，几十 MB 还会被漫游同步走。现在固定指到 `%LOCALAPPDATA%\微信多开助手\webview2`（`main.go` 里的 `WebviewUserDataPath`），纯本地、不漫游、删了自动重建、不影响账号会话。改 exe 名字也不会另起一份。
+
 ---
 
 ## 快速开始

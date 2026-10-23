@@ -92,11 +92,22 @@ if ($gviPath) {
 }
 
 Write-Host '[4/5] go mod tidy' -ForegroundColor Cyan
-go mod tidy
+# go 把下载进度写到 stderr；PS 5.1 在 ErrorActionPreference=Stop 下会把 stderr 当错误中断脚本，
+# 所以这两步单独放开错误偏好，只看退出码。
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+go mod tidy 2>&1 | ForEach-Object { '      ' + $_ }
+$tidyExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEAP
+if ($tidyExit -ne 0) { throw "go mod tidy 失败（exit $tidyExit）" }
 
 Write-Host '[5/5] 编译' -ForegroundColor Cyan
-go build -tags desktop,production -trimpath -ldflags '-w -s -H windowsgui' -o ".\$exePath" .
-if ($LASTEXITCODE -ne 0) { throw "编译失败（exit $LASTEXITCODE）" }
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+go build -tags desktop,production -trimpath -ldflags '-w -s -H windowsgui' -o ".\$exePath" . 2>&1 | ForEach-Object { '      ' + $_ }
+$buildExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEAP
+if ($buildExit -ne 0) { throw "编译失败（exit $buildExit）" }
 
 $size = [math]::Round((Get-Item ".\$exePath").Length / 1MB, 2)
 Write-Host "完成 → $outDir\$exeName ($size MB, 版本 $ver4)" -ForegroundColor Green
