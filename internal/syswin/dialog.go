@@ -43,15 +43,15 @@ type DialogResult struct {
 }
 
 const (
-	dlgWidth     = 420 // 逻辑像素
+	dlgWidth     = 324 // 逻辑像素
 	dlgPadX      = 22
-	dlgPadTop    = 20
-	dlgPadBottom = 18
+	dlgPadTop    = 22
+	dlgPadBottom = 20
 	dlgRadius    = 12
-	dlgBtnW      = 88
-	dlgBtnH      = 34
+	dlgBtnW      = 82
+	dlgBtnH      = 36
 	dlgBtnGap    = 10
-	dlgEditH     = 34
+	dlgEditH     = 38
 
 	dlgClassName = "WxMultiDialgWnd"
 
@@ -301,11 +301,11 @@ func (st *dlgState) dp(v int) int { return v * st.dpi / 96 }
 func (st *dlgState) loadFonts() {
 	name := "Microsoft YaHei UI"
 	p := windows.StringToUTF16Ptr(name)
-	st.fontTitle = createFontHandle(p, int32(st.dp(16)), fwSemiBold)
-	st.fontDesc = createFontHandle(p, int32(st.dp(13)), fwNormal)
-	st.fontBtn = createFontHandle(p, int32(st.dp(13)), fwSemiBold)
-	st.fontHint = createFontHandle(p, int32(st.dp(12)), fwNormal)
-	st.fontEdit = createFontHandle(p, int32(st.dp(14)), fwNormal)
+	st.fontTitle = createFontHandle(p, int32(st.dp(18)), fwSemiBold)
+	st.fontDesc = createFontHandle(p, int32(st.dp(14)), fwNormal)
+	st.fontBtn = createFontHandle(p, int32(st.dp(14)), fwSemiBold)
+	st.fontHint = createFontHandle(p, int32(st.dp(13)), fwNormal)
+	st.fontEdit = createFontHandle(p, int32(st.dp(15)), fwNormal)
 	br, _, _ := procCreateBrush.Call(dlgColCard)
 	st.brushWhite = windows.Handle(br)
 	br, _, _ = procCreateBrush.Call(dlgColGhostBg)
@@ -329,8 +329,8 @@ func (st *dlgState) layout() {
 	innerW := w - padX*2
 
 	y := padTop
-	st.titleRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(26))}
-	y += st.dp(26) + st.dp(4)
+	st.titleRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(30))}
+	y += st.dp(30) + st.dp(6)
 
 	descH := 0
 	if st.opts.Desc != "" {
@@ -338,15 +338,15 @@ func (st *dlgState) layout() {
 		st.descRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + descH)}
 		y += descH
 	}
-	y += st.dp(16)
+	y += st.dp(18)
 
 	if st.opts.Kind == DialogInput {
 		if st.opts.Hint != "" {
-			st.hintRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(16))}
-			y += st.dp(16) + st.dp(6)
+			st.hintRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(18))}
+			y += st.dp(18) + st.dp(8)
 		}
 		st.editRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(dlgEditH))}
-		y += st.dp(dlgEditH) + st.dp(18)
+		y += st.dp(dlgEditH) + st.dp(20)
 	}
 
 	btnW := st.dp(dlgBtnW)
@@ -532,8 +532,8 @@ func (st *dlgState) createEdit() {
 	}
 	cls, _ := windows.UTF16PtrFromString("EDIT")
 	// EDIT 自身高度按字体算，外面再画一圈边框；多留 10px 让它看起来居中
-	editTop := int(st.editRect.Top) + st.dp(7)
-	editH := st.dp(20)
+	editTop := int(st.editRect.Top) + st.dp(8)
+	editH := st.dp(22)
 	h, _, _ := procCreateWindowExW.Call(0, uintptr(unsafe.Pointer(cls)), 0,
 		uintptr(wsChild|wsVisible|wsTabStop|esAutoH),
 		uintptr(int(st.editRect.Left)+st.dp(10)), uintptr(editTop),

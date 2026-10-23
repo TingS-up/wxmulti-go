@@ -624,7 +624,7 @@ el.btnSave.addEventListener('click', () => {
     const r1 = await askDialog({
       kind: 'input',
       title: '保存当前账号',
-      desc: '先在「新开窗口」里扫码登录一个微信，再回来保存。名字只用来在本地区分账号。',
+      desc: '扫码登录一个微信后，回来点保存。\n名字只用来区分账号，不填就用下面的默认名。',
       hint: '留空就用 ' + suggested,
       okText: '保存',
     });
