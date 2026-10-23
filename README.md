@@ -43,6 +43,10 @@ Go + Wails 写的单文件绿色版，界面卡片式，不用安装。
 
 **不往漫游目录写东西**：WebView2 默认会把渲染缓存塞进 `%APPDATA%\<exe 名>`，几十 MB 还会被漫游同步走。现在固定指到 `%LOCALAPPDATA%\微信多开助手\webview2`（`main.go` 里的 `WebviewUserDataPath`），纯本地、不漫游、删了自动重建、不影响账号会话。改 exe 名字也不会另起一份。
 
+**那 70 MB 里没有一行是我们的代码**。拆开看（实测旧目录）：WidevineCdm 21.9 MB（DRM 解密模块）、component_crx_cache 21.5 MB（组件包缓存）、Subresource Filter 12.3 MB（广告过滤规则集）、GrShaderCache 4.7 MB（GPU 着色器缓存）、Default 3.7 MB、Speech Recognition 2.6 MB、hyphen-data 1.7 MB、BrowserMetrics 1.3 MB。前四项是 Chromium 的**组件更新器**在后台自己下下来的，本工具一个都用不上（不播 DRM 视频、不做语音识别、不加载外部网页）。所以 `main.go` 里通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 关了组件更新和后台联网，目录稳定在 **10 MB 左右**（就是 GPU 缓存 + 指标那点东西）。
+
+**为什么要带一份 `third_party/go-webview2`**：go-webview2 的 `preventEnvAndRegistryOverrides()` 会主动把 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 清空（防止环境变量/注册表注入），Wails 也没有暴露传浏览器参数的入口 —— 不补这一刀，参数根本到不了浏览器进程。补丁只改一处语义：**宿主已经设了这个变量就保留，其余照旧清空**；`go.mod` 里用 `replace` 指到本地目录。`go mod tidy` 之前别删这个目录。验证方式：跑起来看 `msedgewebview2.exe` 主进程命令行里有没有 `--disable-component-update`。
+
 ---
 
 ## 快速开始

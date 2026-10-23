@@ -62,6 +62,11 @@ func main() {
 		webviewData = filepath.Join(base, core.AppName, "webview2")
 	}
 
+	// 光换目录只能挪走垃圾，垃圾本身还在：Chromium 的组件更新器会把 Widevine DRM(21.9 MB)、
+	// 组件包缓存(21.5 MB)、广告过滤规则(12.3 MB)、语音识别(2.6 MB) 这些本工具一个都用不上的
+	// 东西下进 user-data 目录。这里把它们关掉，目录从 70 MB 级别压到 10 MB 以内。
+	applyWebviewArgs()
+
 	err = wails.Run(&options.App{
 		Title:            core.AppName,
 		Width:            winWidth,
@@ -93,4 +98,19 @@ func main() {
 		syswin.Fatal(core.AppName, "运行失败：\n"+err.Error())
 		os.Exit(1)
 	}
+}
+
+// applyWebviewArgs 关掉 WebView2 里跟本工具完全无关的后台行为。
+// Wails v2 的 windows.Options 没有暴露浏览器参数，WebView2 认的是环境变量
+// WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS，在创建环境之前设进本进程即可，浏览器子进程会继承。
+func applyWebviewArgs() {
+	const key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+	args := "--disable-component-update " + // 不再下载 Widevine / 过滤规则 / 语音包 / 组件 crx
+		"--disable-background-networking " + // 组件更新、指标上报、变体种子全部停掉
+		"--disk-cache-size=33554432 " + // HTTP 缓存封顶 32 MB（页面全是本地资源，实际用不到 1 MB）
+		"--no-first-run --no-default-browser-check" // 少写几个首次运行状态文件
+	if old := os.Getenv(key); old != "" {
+		args = old + " " + args
+	}
+	_ = os.Setenv(key, args)
 }

@@ -37,3 +37,6 @@ require (
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 )
+
+// 本地补丁版：保留宿主设置的 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS（见 third_party/go-webview2）
+replace github.com/wailsapp/go-webview2 => ./third_party/go-webview2
