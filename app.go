@@ -529,6 +529,7 @@ type DialogRequest struct {
 	Kind       string `json:"kind"`
 	Title      string `json:"title"`
 	Desc       string `json:"desc"`
+	Label      string `json:"label"`
 	Hint       string `json:"hint"`
 	Initial    string `json:"initial"`
 	OKText     string `json:"okText"`
@@ -556,6 +557,7 @@ func (a *App) PromptDialog(req DialogRequest) DialogReply {
 		Kind:       kind,
 		Title:      req.Title,
 		Desc:       req.Desc,
+		Label:      req.Label,
 		Hint:       req.Hint,
 		Initial:    req.Initial,
 		OKText:     req.OKText,

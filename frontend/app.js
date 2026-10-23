@@ -530,6 +530,7 @@ async function askDialog(opts) {
     kind: opts.kind || 'confirm',
     title: opts.title || '',
     desc: opts.desc || '',
+    label: opts.label || '',
     hint: opts.hint || '',
     initial: opts.initial || '',
     okText: opts.okText || '确定',
@@ -625,6 +626,7 @@ el.btnSave.addEventListener('click', () => {
       kind: 'input',
       title: '保存当前账号',
       desc: '扫码登录一个微信后，回来点保存。\n名字只用来区分账号，不填就用下面的默认名。',
+      label: '账号名称',
       hint: '留空就用 ' + suggested,
       okText: '保存',
     });
