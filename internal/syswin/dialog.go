@@ -2,9 +2,13 @@ package syswin
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"runtime"
 	"sync"
 	"unsafe"
+
+	"unicode/utf8"
 
 	"golang.org/x/sys/windows"
 )
@@ -44,15 +48,16 @@ type DialogResult struct {
 }
 
 const (
-	dlgWidth     = 384 // 逻辑像素（8 的倍数）
+	dlgWidth     = 400 // 逻辑像素
 	dlgPadX      = 24
 	dlgPadTop    = 24
 	dlgPadBottom = 24
 	dlgRadius    = 14
-	dlgBtnW      = 88
-	dlgBtnH      = 40
-	dlgBtnGap    = 12
-	dlgEditH     = 40
+	dlgBtnW      = 112
+	dlgBtnH      = 44
+	dlgBtnGap    = 8
+	dlgTextBtnW  = 88
+	dlgEditH     = 52
 
 	dlgClassName = "WxMultiDialgWnd"
 
@@ -74,6 +79,9 @@ const (
 	wmDlgLButtonUp    = 0x0202
 	wmDlgKeyDown      = 0x0100
 	wmDlgGetText      = 0x000D
+	wmDlgCommand      = 0x0111
+	wmDlgLButtonDown  = 0x0201
+	enChange          = 0x0300
 	wmDlgAppOK        = 0x8000 + 1
 	wmDlgAppCancel    = 0x8000 + 2
 
@@ -104,6 +112,13 @@ const (
 	dlgColDanger   = 0x003F45E0 // #E0453F（BGR 反过来写）
 	dlgColDangerH  = 0x00343AC9 // #C93A34
 	dlgColGhostBgH = 0x00F3F7F3 // #F3F7F3 次要按钮悬停
+	dlgColIconBg   = 0x00EFF8E8 // #E8F8EF 图标底
+	dlgColIconBack = 0x00C2E3A9 // #A9E3C2 图标后层
+	dlgColTextBtn  = 0x00505A4E // #4E5A50 纯文字按钮
+	dlgColError    = 0x00333AD9 // #D93A33 校验错误（对比度 4.6:1）
+	dlgColDisBg    = 0x00F0F3F0 // #F0F3F0 禁用按钮底
+	dlgColDisTx    = 0x00979F99 // #999F97 禁用按钮字
+	dlgColKeys     = 0x007C8A7F // #7F8A7C 键盘提示
 	dlgColGhostTx  = 0x00303C33 // #333C30
 )
 
@@ -163,8 +178,12 @@ type dlgState struct {
 	editRect   rect
 	okRect     rect
 	cancelRect rect
+	keysRect   rect
 
-	hover int // 1=确定 2=取消
+	hover   int    // 1=确定 2=取消
+	pressed int    // 1=确定 2=取消 正被按住
+	errText string // 内联校验错误（空串表示没错误）
+	okOK    bool   // 主按钮是否可用
 	done  bool
 	ok    bool
 	text  string
@@ -181,7 +200,7 @@ func ShowDialog(o DialogOpts) DialogResult {
 		return DialogResult{OK: false}
 	}
 
-	st := &dlgState{opts: o, dpi: systemDPI(), hover: 0}
+	st := &dlgState{opts: o, dpi: systemDPI(), hover: 0, okOK: true}
 	st.loadFonts()
 	defer st.freeFonts()
 	st.layout()
@@ -307,12 +326,13 @@ func (st *dlgState) dp(v int) int { return v * st.dpi / 96 }
 func (st *dlgState) loadFonts() {
 	name := "Microsoft YaHei UI"
 	p := windows.StringToUTF16Ptr(name)
-	st.fontTitle = createFontHandle(p, int32(st.dp(22)), fwSemiBold)
-	st.fontDesc = createFontHandle(p, int32(st.dp(14)), fwNormal)
-	st.fontBtn = createFontHandle(p, int32(st.dp(15)), fwSemiBold)
-	st.fontHint = createFontHandle(p, int32(st.dp(13)), fwNormal)
-	st.fontLabel = createFontHandle(p, int32(st.dp(13)), fwSemiBold)
-	st.fontEdit = createFontHandle(p, int32(st.dp(16)), fwNormal)
+	// 视觉刻度取 24 / 16 / 14 / 12（模块化刻度）；CreateFont 高度 ≈ 视觉 × 1.33
+	st.fontTitle = createFontHandle(p, int32(st.dp(32)), fwSemiBold) // 视觉 24
+	st.fontDesc = createFontHandle(p, int32(st.dp(21)), fwNormal)    // 视觉 16
+	st.fontBtn = createFontHandle(p, int32(st.dp(21)), fwSemiBold)   // 视觉 16
+	st.fontHint = createFontHandle(p, int32(st.dp(16)), fwNormal)    // 视觉 12
+	st.fontLabel = createFontHandle(p, int32(st.dp(19)), fwSemiBold) // 视觉 14
+	st.fontEdit = createFontHandle(p, int32(st.dp(21)), fwNormal)    // 视觉 16
 	br, _, _ := procCreateBrush.Call(dlgColCard)
 	st.brushWhite = windows.Handle(br)
 	br, _, _ = procCreateBrush.Call(dlgColGhostBgH)
@@ -336,47 +356,81 @@ func (st *dlgState) layout() {
 	innerW := w - padX*2
 
 	y := padTop
-	// 标题：22px 半粗，行高 32
-	st.titleRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(32))}
-	y += st.dp(32) + st.dp(8)
+	// 输入型弹窗不要标题和说明：字段标签 + 输入框已经够说明问题。
+	// 窗口自身的标题（任务栏/无障碍读到的那份）仍然保留，不受影响。
+	if st.opts.Kind != DialogInput {
+		st.titleRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(38))}
+		y += st.dp(38) + st.dp(8)
 
-	// 说明：15px，行高由 DrawText 按字体算
-	descH := 0
-	if st.opts.Desc != "" {
-		descH = st.measureWrapped(st.opts.Desc, innerW, st.fontDesc)
-		st.descRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + descH)}
-		y += descH
+		if st.opts.Desc != "" {
+			descH := st.measureWrapped(st.opts.Desc, innerW, st.fontDesc)
+			st.descRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + descH)}
+			y += descH
+		}
+		y += st.dp(24)
 	}
-	y += st.dp(24)
 
-	// 输入框 44 高；提示文字放在框下面（helpers 在字段下方，比塞在框上面干净）
 	if st.opts.Kind == DialogInput {
 		if st.opts.Label != "" {
-			st.labelRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(18))}
-			y += st.dp(18) + st.dp(8)
+			st.labelRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(22))}
+			y += st.dp(22) + st.dp(6)
 		}
 		st.editRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(dlgEditH))}
 		y += st.dp(dlgEditH)
 		if st.opts.Hint != "" {
 			y += st.dp(8)
-			st.hintRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(18))}
-			y += st.dp(18)
+			st.hintRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(22))}
+			y += st.dp(22)
 		}
 		y += st.dp(24)
 	}
 
-	btnW := st.dp(dlgBtnW)
 	btnH := st.dp(dlgBtnH)
 	btnY := y
+	btnW := st.dp(dlgBtnW)
 	st.okRect = rect{int32(w - padX - btnW), int32(btnY), int32(w - padX), int32(btnY + btnH)}
 	if st.opts.Kind != DialogAlert {
-		cx2 := st.okRect.Left - int32(st.dp(dlgBtnGap))
-		st.cancelRect = rect{cx2 - int32(btnW), int32(btnY), cx2, int32(btnY + btnH)}
+		textW := st.dp(dlgTextBtnW)
+		rightEdge := st.okRect.Left - int32(st.dp(dlgBtnGap))
+		st.cancelRect = rect{rightEdge - int32(textW), int32(btnY), rightEdge, int32(btnY + btnH)}
+		st.keysRect = rect{int32(padX), int32(btnY), st.cancelRect.Left - int32(st.dp(8)), int32(btnY + btnH)}
+	} else {
+		st.keysRect = rect{int32(padX), int32(btnY), st.okRect.Left - int32(st.dp(8)), int32(btnY + btnH)}
 	}
 	st.w = w
 	st.h = btnY + btnH + st.dp(dlgPadBottom)
 }
-
+// validate 复查输入：留空算合法（退回默认名）；超 32 字、以下划线或点开头、
+// 含路径或非法字符时，主按钮置灰并在输入框下方用红字说明。
+func (st *dlgState) validate() {
+	if st.opts.Kind != DialogInput || st.edit == 0 {
+		st.okOK = true
+		st.errText = ""
+		return
+	}
+	buf := make([]uint16, 512)
+	n, _, _ := procSendMessageW.Call(uintptr(st.edit), wmDlgGetText,
+		uintptr(len(buf)), uintptr(unsafe.Pointer(&buf[0])))
+	raw := ""
+	if n > 0 {
+		raw = windows.UTF16ToString(buf[:n])
+	}
+	name := strings.TrimSpace(raw)
+	cnt := utf8.RuneCountInString(name)
+	switch {
+	case name == "":
+		st.errText = ""
+	case cnt > 32:
+		st.errText = "名字最多 32 个字，现在 " + strconv.Itoa(cnt) + " 个"
+	case strings.HasPrefix(name, "_") || strings.HasPrefix(name, "."):
+		st.errText = "不能以下划线或点开头"
+	case strings.ContainsAny(name, "\\/:*?\"<>|"):
+		st.errText = "不能包含 \\ / : * ? \" < > | 这些字符"
+	default:
+		st.errText = ""
+	}
+	st.okOK = st.errText == ""
+}
 // measureWrapped 量一段自动换行文本的高度。
 func (st *dlgState) measureWrapped(s string, width int, font windows.Handle) int {
 	hdc, _, _ := procGetDC.Call(0)
@@ -397,6 +451,9 @@ func (st *dlgState) measureWrapped(s string, width int, font windows.Handle) int
 }
 
 func (st *dlgState) finish(ok bool) {
+	if ok && !st.okOK {
+		return // 有校验错误时忽略提交（回车也一样）
+	}
 	st.ok = ok
 	if ok && st.edit != 0 {
 		buf := make([]uint16, 512)
@@ -442,6 +499,30 @@ func rawDialogWndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 	case wmDlgEraseBg:
 		return 1
 
+	case wmDlgCommand:
+		// EDIT 内容一变就复查，错误即时显示、主按钮跟着灰
+		if st := currentDlg(hwnd); st != nil && (wparam>>16) == enChange {
+			st.validate()
+			procInvalidateRc.Call(hwnd, 0, 0)
+		}
+		return 0
+
+	case wmDlgLButtonDown:
+		st := currentDlg(hwnd)
+		if st == nil {
+			break
+		}
+		x := int(int16(lparam & 0xFFFF))
+		y := int(int16((lparam >> 16) & 0xFFFF))
+		if dlgPtIn(st.okRect, x, y) {
+			st.pressed = 1
+			procInvalidateRc.Call(hwnd, 0, 0)
+		} else if st.opts.Kind != DialogAlert && dlgPtIn(st.cancelRect, x, y) {
+			st.pressed = 2
+			procInvalidateRc.Call(hwnd, 0, 0)
+		}
+		return 0
+
 	case wmDlgMouseMove:
 		st := currentDlg(hwnd)
 		if st == nil {
@@ -466,6 +547,7 @@ func rawDialogWndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		if st == nil {
 			break
 		}
+		st.pressed = 0
 		x := int(int16(lparam & 0xFFFF))
 		y := int(int16((lparam >> 16) & 0xFFFF))
 		if dlgPtIn(st.okRect, x, y) {
@@ -548,8 +630,8 @@ func (st *dlgState) createEdit() {
 	}
 	cls, _ := windows.UTF16PtrFromString("EDIT")
 	// EDIT 自身高度按字体算，外面再画一圈边框；多留 10px 让它看起来居中
-	editTop := int(st.editRect.Top) + st.dp(10)
-	editH := st.dp(22)
+	editTop := int(st.editRect.Top) + st.dp(14)
+	editH := st.dp(26)
 	h, _, _ := procCreateWindowExW.Call(0, uintptr(unsafe.Pointer(cls)), 0,
 		uintptr(wsChild|wsVisible|wsTabStop|esAutoH),
 		uintptr(int(st.editRect.Left)+st.dp(14)), uintptr(editTop),
@@ -619,65 +701,78 @@ func paintDialog(st *dlgState, hdc uintptr) {
 
 	procSetBkModeM.Call(hdc, transparentBkMode)
 
-	if st.opts.Title != "" {
-		dlgDrawText(st, hdc, st.opts.Title, st.titleRect, st.fontTitle, dlgColTitle, dtSingleLine|dtVCenter|dtNoPrefix)
-	}
-	if st.opts.Desc != "" {
-		dlgDrawText(st, hdc, st.opts.Desc, st.descRect, st.fontDesc, dlgColDesc, dtWordBreak|dtNoPrefix)
+	if st.opts.Kind != DialogInput {
+		if st.opts.Title != "" {
+			dlgDrawText(st, hdc, st.opts.Title, st.titleRect, st.fontTitle, dlgColTitle, dtSingleLine|dtVCenter|dtNoPrefix)
+		}
+		if st.opts.Desc != "" {
+			dlgDrawText(st, hdc, st.opts.Desc, st.descRect, st.fontDesc, dlgColDesc, dtWordBreak|dtNoPrefix)
+		}
 	}
 
 	if st.opts.Kind == DialogInput {
 		if st.opts.Label != "" {
 			dlgDrawText(st, hdc, st.opts.Label, st.labelRect, st.fontLabel, dlgColLabel, dtSingleLine|dtVCenter|dtNoPrefix)
 		}
-		// 输入框：浅底 + 圆角描边；聚焦时换成品牌绿 2px
-		dlgFillRoundRectBrush(hdc, st.editRect, st.dp(10), uintptr(st.brushGhost))
+		dlgFillRoundRectBrush(hdc, st.editRect, st.dp(12), uintptr(st.brushGhost))
 		focus, _, _ := procGetFocus.Call(0)
-		if st.edit != 0 && windows.Handle(focus) == st.edit {
-			dlgStrokeRoundRect(hdc, st.editRect, st.dp(10), dlgColPrimary, 2)
-		} else {
-			dlgStrokeRoundRect(hdc, st.editRect, st.dp(10), dlgColField, 1)
+		switch {
+		case st.errText != "":
+			dlgStrokeRoundRect(hdc, st.editRect, st.dp(12), dlgColError, 2)
+		case st.edit != 0 && windows.Handle(focus) == st.edit:
+			dlgStrokeRoundRect(hdc, st.editRect, st.dp(12), dlgColPrimary, 2)
+		default:
+			dlgStrokeRoundRect(hdc, st.editRect, st.dp(12), dlgColField, 1)
 		}
-		if st.opts.Hint != "" {
+		// 同一行位置：有错误显示红字，否则显示灰色辅助说明
+		if st.errText != "" {
+			dlgDrawText(st, hdc, st.errText, st.hintRect, st.fontHint, dlgColError, dtSingleLine|dtVCenter|dtNoPrefix)
+		} else if st.opts.Hint != "" {
 			dlgDrawText(st, hdc, st.opts.Hint, st.hintRect, st.fontHint, dlgColHint, dtSingleLine|dtVCenter|dtNoPrefix)
 		}
 	}
 
-	// 主按钮：品牌绿（危险操作换红）
+	// 主按钮：胶囊形（圆角 = 高度一半）
+	pill := st.dp(dlgBtnH) / 2
 	okBg := uintptr(dlgColPrimary)
+	okFg := uintptr(dlgColCard)
 	if st.opts.Danger {
 		okBg = dlgColDanger
 	}
-	if st.hover == 1 {
+	switch {
+	case !st.okOK:
+		okBg = dlgColDisBg
+		okFg = dlgColDisTx
+	case st.pressed == 1 || st.hover == 1:
 		if st.opts.Danger {
 			okBg = dlgColDangerH
 		} else {
 			okBg = dlgColPrimaryH
 		}
 	}
-	dlgFillRoundRect(hdc, st.okRect, st.dp(10), okBg)
+	dlgFillRoundRect(hdc, st.okRect, pill, okBg)
 	okLabel := st.opts.OKText
 	if okLabel == "" {
 		okLabel = "确定"
 	}
-	dlgDrawText(st, hdc, okLabel, st.okRect, st.fontBtn, dlgColCard, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	dlgDrawText(st, hdc, okLabel, st.okRect, st.fontBtn, okFg, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 
-	// 次要按钮：白底细边，悬停浅灰（比实心灰更像现代桌面应用的次要动作）
+	// 次要动作：纯文字按钮，只有悬停才铺一层浅灰
 	if st.opts.Kind != DialogAlert {
 		if st.hover == 2 {
-			dlgFillRoundRectBrush(hdc, st.cancelRect, st.dp(10), uintptr(st.brushGhostH))
-		} else {
-			dlgFillRoundRect(hdc, st.cancelRect, st.dp(10), dlgColCard)
+			dlgFillRoundRectBrush(hdc, st.cancelRect, pill, uintptr(st.brushGhostH))
 		}
-		dlgStrokeRoundRect(hdc, st.cancelRect, st.dp(10), dlgColField, 1)
 		cl := st.opts.CancelText
 		if cl == "" {
 			cl = "取消"
 		}
-		dlgDrawText(st, hdc, cl, st.cancelRect, st.fontBtn, dlgColGhostTx, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		dlgDrawText(st, hdc, cl, st.cancelRect, st.fontBtn, dlgColTextBtn, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		// 左下角键盘提示：桌面端习惯，成本一行字
+		if st.opts.Kind == DialogInput {
+			dlgDrawText(st, hdc, "Enter 确定 · Esc 取消", st.keysRect, st.fontHint, dlgColKeys, dtSingleLine|dtVCenter|dtNoPrefix)
+		}
 	}
 }
-
 func dlgDrawText(st *dlgState, hdc uintptr, s string, r rect, font windows.Handle, color uintptr, flags uintptr) {
 	if s == "" {
 		return

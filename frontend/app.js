@@ -637,7 +637,7 @@ el.btnSave.addEventListener('click', () => {
       const r2 = await askDialog({
         kind: 'confirm',
         title: '覆盖已有账号？',
-        desc: `「${name}」已经存在，覆盖后旧的登录会话会丢失。`,
+        desc: `「${name}」已存在，覆盖会丢掉旧的登录会话。`,
         danger: true,
         okText: '覆盖',
       });
@@ -659,8 +659,8 @@ el.btnDelete.addEventListener('click', () => {
       kind: 'confirm',
       title: one ? '删除账号' : `删除 ${names.length} 个账号`,
       desc: one
-        ? `确定删除「${names[0]}」的本地登录会话吗？下次使用需要重新扫码。`
-        : `确定删除这 ${names.length} 个账号的本地登录会话吗？\n${names.join('、')}`,
+        ? `删除「${names[0]}」的登录会话？下次要重新扫码。`
+        : `删除这 ${names.length} 个账号的登录会话？下次要重新扫码。`,
       danger: true,
       okText: '删除',
     });
