@@ -44,15 +44,15 @@ type DialogResult struct {
 }
 
 const (
-	dlgWidth     = 368 // 逻辑像素
-	dlgPadX      = 28
-	dlgPadTop    = 26
+	dlgWidth     = 384 // 逻辑像素（8 的倍数）
+	dlgPadX      = 24
+	dlgPadTop    = 24
 	dlgPadBottom = 24
 	dlgRadius    = 14
-	dlgBtnW      = 92
+	dlgBtnW      = 88
 	dlgBtnH      = 40
 	dlgBtnGap    = 12
-	dlgEditH     = 44
+	dlgEditH     = 40
 
 	dlgClassName = "WxMultiDialgWnd"
 
@@ -96,8 +96,9 @@ const (
 	dlgColField    = 0x00DCE3DC // #DCE3DC 输入框描边
 	dlgColFieldBg  = 0x00FBFDFB // #FBFDFB 输入框底色
 	dlgColTitle    = 0x00222A1B // #1B2A22 深墨绿标题
-	dlgColDesc     = 0x00596B60 // #606B59 → 正文灰绿
-	dlgColHint     = 0x00879A8D // #8D9A87 → 次要信息
+	dlgColDesc     = 0x005D6859 // #59685D → 正文灰绿
+	dlgColHint     = 0x00707A6C // #6C7A70 → 辅助说明（对比度 4.6:1）
+	dlgColLabel    = 0x00404A3C // #3C4A40 → 字段标签
 	dlgColPrimary  = 0x0060C107 // #07C160 品牌绿
 	dlgColPrimaryH = 0x004FB005 // #05B04F 悬停深一档
 	dlgColDanger   = 0x003F45E0 // #E0453F（BGR 反过来写）
@@ -144,6 +145,7 @@ type dlgState struct {
 	fontDesc  windows.Handle
 	fontBtn   windows.Handle
 	fontHint  windows.Handle
+	fontLabel windows.Handle
 	fontEdit  windows.Handle
 
 	brushWhite  windows.Handle
@@ -305,11 +307,12 @@ func (st *dlgState) dp(v int) int { return v * st.dpi / 96 }
 func (st *dlgState) loadFonts() {
 	name := "Microsoft YaHei UI"
 	p := windows.StringToUTF16Ptr(name)
-	st.fontTitle = createFontHandle(p, int32(st.dp(20)), fwSemiBold)
-	st.fontDesc = createFontHandle(p, int32(st.dp(15)), fwNormal)
+	st.fontTitle = createFontHandle(p, int32(st.dp(22)), fwSemiBold)
+	st.fontDesc = createFontHandle(p, int32(st.dp(14)), fwNormal)
 	st.fontBtn = createFontHandle(p, int32(st.dp(15)), fwSemiBold)
 	st.fontHint = createFontHandle(p, int32(st.dp(13)), fwNormal)
-	st.fontEdit = createFontHandle(p, int32(st.dp(17)), fwNormal)
+	st.fontLabel = createFontHandle(p, int32(st.dp(13)), fwSemiBold)
+	st.fontEdit = createFontHandle(p, int32(st.dp(16)), fwNormal)
 	br, _, _ := procCreateBrush.Call(dlgColCard)
 	st.brushWhite = windows.Handle(br)
 	br, _, _ = procCreateBrush.Call(dlgColGhostBgH)
@@ -319,7 +322,7 @@ func (st *dlgState) loadFonts() {
 }
 
 func (st *dlgState) freeFonts() {
-	for _, h := range []windows.Handle{st.fontTitle, st.fontDesc, st.fontBtn, st.fontHint, st.fontEdit, st.brushWhite, st.brushGhost, st.brushGhostH} {
+	for _, h := range []windows.Handle{st.fontTitle, st.fontDesc, st.fontBtn, st.fontHint, st.fontLabel, st.fontEdit, st.brushWhite, st.brushGhost, st.brushGhostH} {
 		if h != 0 {
 			procDeleteObjM.Call(uintptr(h))
 		}
@@ -333,9 +336,9 @@ func (st *dlgState) layout() {
 	innerW := w - padX*2
 
 	y := padTop
-	// 标题：20px 半粗，行高 28
-	st.titleRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(28))}
-	y += st.dp(28) + st.dp(10)
+	// 标题：22px 半粗，行高 32
+	st.titleRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(32))}
+	y += st.dp(32) + st.dp(8)
 
 	// 说明：15px，行高由 DrawText 按字体算
 	descH := 0
@@ -344,13 +347,13 @@ func (st *dlgState) layout() {
 		st.descRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + descH)}
 		y += descH
 	}
-	y += st.dp(22)
+	y += st.dp(24)
 
 	// 输入框 44 高；提示文字放在框下面（helpers 在字段下方，比塞在框上面干净）
 	if st.opts.Kind == DialogInput {
 		if st.opts.Label != "" {
 			st.labelRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(18))}
-			y += st.dp(18) + st.dp(6)
+			y += st.dp(18) + st.dp(8)
 		}
 		st.editRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(dlgEditH))}
 		y += st.dp(dlgEditH)
@@ -359,7 +362,7 @@ func (st *dlgState) layout() {
 			st.hintRect = rect{int32(padX), int32(y), int32(padX + innerW), int32(y + st.dp(18))}
 			y += st.dp(18)
 		}
-		y += st.dp(20)
+		y += st.dp(24)
 	}
 
 	btnW := st.dp(dlgBtnW)
@@ -545,7 +548,7 @@ func (st *dlgState) createEdit() {
 	}
 	cls, _ := windows.UTF16PtrFromString("EDIT")
 	// EDIT 自身高度按字体算，外面再画一圈边框；多留 10px 让它看起来居中
-	editTop := int(st.editRect.Top) + st.dp(11)
+	editTop := int(st.editRect.Top) + st.dp(10)
 	editH := st.dp(22)
 	h, _, _ := procCreateWindowExW.Call(0, uintptr(unsafe.Pointer(cls)), 0,
 		uintptr(wsChild|wsVisible|wsTabStop|esAutoH),
@@ -625,7 +628,7 @@ func paintDialog(st *dlgState, hdc uintptr) {
 
 	if st.opts.Kind == DialogInput {
 		if st.opts.Label != "" {
-			dlgDrawText(st, hdc, st.opts.Label, st.labelRect, st.fontHint, dlgColDesc, dtSingleLine|dtVCenter|dtNoPrefix)
+			dlgDrawText(st, hdc, st.opts.Label, st.labelRect, st.fontLabel, dlgColLabel, dtSingleLine|dtVCenter|dtNoPrefix)
 		}
 		// 输入框：浅底 + 圆角描边；聚焦时换成品牌绿 2px
 		dlgFillRoundRectBrush(hdc, st.editRect, st.dp(10), uintptr(st.brushGhost))

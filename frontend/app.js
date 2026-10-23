@@ -625,9 +625,9 @@ el.btnSave.addEventListener('click', () => {
     const r1 = await askDialog({
       kind: 'input',
       title: '保存当前账号',
-      desc: '扫码登录一个微信后，回来点保存。\n名字只用来区分账号，不填就用下面的默认名。',
+      desc: '保存当前登录的微信，下次免扫码直接进。',
       label: '账号名称',
-      hint: '留空就用 ' + suggested,
+      hint: '留空自动命名：' + suggested,
       okText: '保存',
     });
     if (!r1.ok) return;
